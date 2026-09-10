@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Maze Duel (6x6)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #0f0e17;
+            color: #fffffe;
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+
+        h1 {
+            color: #ff8906;
+            text-shadow: 3px 3px #000;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        #status-bar {
+            background: #16161a;
+            border: 3px solid #72757e;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+            max-width: 580px;
+            width: 100%;
+            font-size: 10px;
+            line-height: 1.6;
+            color: #a7a9be;
+            border-radius: 4px;
+            box-shadow: 0 4px 0 #000;
+        }
+
+        .highlight {
+            color: #ff8906;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .board-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #16161a;
+            padding: 12px;
+            border: 4px solid #2cb67d;
+            border-radius: 6px;
+            box-shadow: 0 8px 0 #000;
+            transition: transform 0.2s;
+        }
+
+        .shake-anim {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        .board-title {
+            font-size: 11px;
+            margin-bottom: 10px;
+            color: #2cb67d;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 38px 8px) 38px;
+            grid-template-rows: repeat(5, 38px 8px) 38px;
+            background-color: #010101;
+            padding: 6px;
+            border: 3px solid #72757e;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        .cell {
+            background-color: #242629;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.15s;
+        }
+
+        .cell:hover {
+            background-color: #383a3e;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            70% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .cell.start { 
+            background-color: #2cb67d !important; 
+            color: #000; 
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cell.goal { 
+            background-color: #e53170 !important; 
+            color: #fff; 
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cell.player { 
+            background-color: #ff8906 !important; 
+            animation: popIn 0.2s ease-out;
+        }
+        .cell.bot { 
+            background-color: #00b4d8 !important; 
+            animation: popIn 0.2s ease-out;
+        }
+
+        .edge-h, .edge-v {
+            background-color: #121315;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .edges-disabled .edge-h, .edges-disabled .edge-v {
+            pointer-events: none;
+            cursor: default;
+        }
+
+        .edge-h:hover, .edge-v:hover {
+            background-color: #ff8906;
+        }
+
+        .edge-corner {
+            background-color: #010101;
+            pointer-events: none !important;
+        }
+
+        @keyframes wallSnap {
+            0% { transform: scale(0.3); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .wall-placed {
+            background-color: #e53170 !important;
+            box-shadow: 0 0 6px #e53170;
+            animation: wallSnap 0.2s ease-out;
+        }
+
+        .wall-revealed {
+            background-color: #ff8906 !important;
+            box-shadow: 0 0 6px #ff8906;
+            animation: wallSnap 0.2s ease-out;
+        }
+
+        .btn {
+            background: #ff8906;
+            color: #0f0e17;
+            border: none;
+            padding: 12px 20px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 4px 0 #a35600;
+            border-radius: 2px;
+            transition: transform 0.1s, background 0.15s;
+        }
+
+        .btn:hover {
+            background: #ffa033;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #a35600;
+        }
+
+        .controls {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(3, 42px);
+            gap: 6px;
+        }
+
+        .dpad-btn {
+            background: #72757e;
+            color: #fff;
+            border: none;
+            height: 42px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #4a4c52;
+            border-radius: 4px;
+            transition: background 0.1s;
+        }
+
+        .dpad-btn:active {
+            box-shadow: none;
+            transform: translateY(3px);
+            background: #ff8906;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PIXEL MAZE DUEL</h1>
+
+    <div id="status-bar">Загрузка игры...</div>
+
+    <div class="game-container">
+        <div id="main-board-wrapper" class="board-wrapper">
+            <div id="board-title" class="board-title">ПОДГОТОВКА КАРТЫ</div>
+            <div id="grid-main" class="grid edges-disabled"></div>
+
+            <button id="start-btn" class="btn hidden" onclick="finishSetup()">НАЧАТЬ ИГРУ</button>
+
+            <div id="dpad" class="controls hidden">
+                <div></div>
+                <button class="dpad-btn" onclick="playerMove(-1, 0)">▲</button>
+                <div></div>
+                <button class="dpad-btn" onclick="playerMove(0, -1)">◄</button>
+                <button class="dpad-btn" onclick="playerMove(1, 0)">▼</button>
+                <button class="dpad-btn" onclick="playerMove(0, 1)">►</button>
+            </div>
+        </div>
+
+        <div id="bot-board-wrapper" class="board-wrapper hidden" style="border-color: #00b4d8;">
+            <div class="board-title" style="color: #00b4d8;">ВАША КАРТА (ХОД БОТА)</div>
+            <div id="grid-bot-view" class="grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 6;
+        const REQUIRED_WALLS = 20;
+
+        let gameState = 'SETUP_A';
+
+        let playerSetup = { start: null, goal: null, walls: new Set() };
+        let botSetup = { start: null, goal: null, walls: new Set() };
+
+        let playerPos = null;
+        let botPos = null;
+
+        let playerKnownBotWalls = new Set();
+        let botMemory = { knownWalls: new Set() };
+
+        const statusEl = document.getElementById('status-bar');
+        const startBtn = document.getElementById('start-btn');
+        const dpadEl = document.getElementById('dpad');
+        const botBoardWrapper = document.getElementById('bot-board-wrapper');
+        const mainBoardWrapper = document.getElementById('main-board-wrapper');
+
+        window.onload = () => {
+            initSetupPhase();
+        };
+
+        function initSetupPhase() {
+            gameState = 'SETUP_A';
+            playerSetup = { start: null, goal: null, walls: new Set() };
+            updateStatus('Кликните на клетку, чтобы поставить <span class="highlight">Точку А (Старт)</span>.');
+            renderBoard('grid-main', true);
+        }
+
+        function renderBoard(containerId, isSetup = false, isBotView = false) {
+            const grid = document.getElementById(containerId);
+            grid.innerHTML = '';
+
+            if (isSetup && gameState === 'SETUP_WALLS') {
+                grid.classList.remove('edges-disabled');
+            } else {
+                grid.classList.add('edges-disabled');
+            }
+
+            for (let r = 0; r < 11; r++) {
+                for (let c = 0; c < 11; c++) {
+                    const isCellRow = r % 2 === 0;
+                    const isCellCol = c % 2 === 0;
+
+                    const cellR = Math.floor(r / 2);
+                    const cellC = Math.floor(c / 2);
+
+                    const div = document.createElement('div');
+
+                    if (isCellRow && isCellCol) {
+                        // КЛЕТКА
+                        div.className = 'cell';
+                        if (isSetup) {
+                            if (playerSetup.start && playerSetup.start.r === cellR && playerSetup.start.c === cellC) {
+                                div.classList.add('start');
+                                div.innerText = 'A';
+                            } else if (playerSetup.goal && playerSetup.goal.r === cellR && playerSetup.goal.c === cellC) {
+                                div.classList.add('goal');
+                                div.innerText = 'Б';
+                            }
+                            div.onclick = () => handleCellClick(cellR, cellC);
+                        } else if (!isBotView) {
+                            if (botSetup.goal && botSetup.goal.r === cellR && botSetup.goal.c === cellC) {
+                                div.classList.add('goal');
+                                div.innerText = 'Б';
+                            }
+                            if (playerPos && playerPos.r === cellR && playerPos.c === cellC) {
+                                div.classList.add('player');
+                                div.innerText = '🧙';
+                            }
+                        } else {
+                            if (playerSetup.start && playerSetup.start.r === cellR && playerSetup.start.c === cellC) {
+                                div.classList.add('start');
+                                div.innerText = 'A';
+                            }
+                            if (playerSetup.goal && playerSetup.goal.r === cellR && playerSetup.goal.c === cellC) {
+                                div.classList.add('goal');
+                                div.innerText = 'Б';
+                            }
+                            if (botPos && botPos.r === cellR && botPos.c === cellC) {
+                                div.classList.add('bot');
+                                div.innerText = '🤖';
+                            }
+                        }
+
+                    } else if (!isCellRow && !isCellCol) {
+                        div.className = 'edge-corner';
+                    } else {
+                        const isHorizontal = !isCellRow && isCellCol;
+                        const edgeR = isHorizontal ? Math.floor(r / 2) : cellR;
+                        const edgeC = isHorizontal ? cellC : Math.floor(c / 2);
+                        const edgeKey = isHorizontal ? `H_${edgeR}_${edgeC}` : `V_${edgeR}_${edgeC}`;
+
+                        div.className = isHorizontal ? 'edge-h' : 'edge-v';
+
+                        if (isSetup) {
+                            if (playerSetup.walls.has(edgeKey)) {
+                                div.classList.add('wall-placed');
+                            }
+                            div.onclick = () => handleEdgeClick(edgeKey);
+                        } else if (!isBotView) {
+                            if (playerKnownBotWalls.has(edgeKey)) {
+                                div.classList.add('wall-revealed');
+                            }
+                        } else {
+                            if (playerSetup.walls.has(edgeKey)) {
+                                div.classList.add('wall-placed');
+                            }
+                        }
+                    }
+                    grid.appendChild(div);
+                }
+            }
+        }
+
+        function handleCellClick(r, c) {
+            if (gameState === 'SETUP_A') {
+                playerSetup.start = { r, c };
+                gameState = 'SETUP_B';
+                updateStatus('Точка А выбрана! Выберите <span class="highlight">Точку Б (Финиш)</span>.');
+                renderBoard('grid-main', true);
+            } else if (gameState === 'SETUP_B') {
+                if (playerSetup.start.r === r && playerSetup.start.c === c) return;
+                playerSetup.goal = { r, c };
+                gameState = 'SETUP_WALLS';
+                updateStatus(`Расставьте <span class="highlight">20 стен</span> на границах клеток (${playerSetup.walls.size}/20).`);
+                renderBoard('grid-main', true);
+            }
+        }
+
+        function handleEdgeClick(edgeKey) {
+            if (gameState !== 'SETUP_WALLS') return;
+
+            if (playerSetup.walls.has(edgeKey)) {
+                playerSetup.walls.delete(edgeKey);
+            } else {
+                if (playerSetup.walls.size >= REQUIRED_WALLS) {
+                    updateStatus(`<span class="highlight">Уже поставлено 20 стен!</span> Нажмите "НАЧАТЬ ИГРУ".`);
+                    return;
+                }
+
+                playerSetup.walls.add(edgeKey);
+
+                if (hasIsolatedCell(playerSetup.walls) || !isGraphFullyConnected(playerSetup.walls)) {
+                    playerSetup.walls.delete(edgeKey);
+                    triggerShake('grid-main');
+                    updateStatus(`<span class="highlight" style="color:#e53170;">Нельзя перекрывать клетку!</span> Клетка не может быть полностью закрыта.`);
+                    return;
+                }
+            }
+
+            const count = playerSetup.walls.size;
+            updateStatus(`Поставлено стен: <span class="highlight">${count}/${REQUIRED_WALLS}</span>.`);
+            
+            if (count === REQUIRED_WALLS) {
+                startBtn.classList.remove('hidden');
+            } else {
+                startBtn.classList.add('hidden');
+            }
+
+            renderBoard('grid-main', true);
+        }
+
+        function hasIsolatedCell(wallsSet) {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    let openSides = 0;
+                    if (r > 0 && !wallsSet.has(`H_${r-1}_${c}`)) openSides++;
+                    if (r < GRID_SIZE - 1 && !wallsSet.has(`H_${r}_${c}`)) openSides++;
+                    if (c > 0 && !wallsSet.has(`V_${r}_${c-1}`)) openSides++;
+                    if (c < GRID_SIZE - 1 && !wallsSet.has(`V_${r}_${c}`)) openSides++;
+
+                    if (openSides === 0) return true; 
+                }
+            }
+            return false;
+        }
+
+        function isGraphFullyConnected(wallsSet) {
+            let visited = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(false));
+            let queue = [{ r: 0, c: 0 }];
+            visited[0][0] = true;
+            let visitedCount = 1;
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                let neighbors = getValidNeighbors(curr.r, curr.c, wallsSet);
+
+                for (let n of neighbors) {
+                    if (!visited[n.r][n.c]) {
+                        visited[n.r][n.c] = true;
+                        visitedCount++;
+                        queue.push({ r: n.r, c: n.c });
+                    }
+                }
+            }
+            return visitedCount === (GRID_SIZE * GRID_SIZE);
+        }
+
+        function getValidNeighbors(r, c, wallsSet) {
+            let res = [];
+            if (r > 0 && !wallsSet.has(`H_${r-1}_${c}`)) res.push({ r: r - 1, c });
+            if (r < GRID_SIZE - 1 && !wallsSet.has(`H_${r}_${c}`)) res.push({ r: r + 1, c });
+            if (c > 0 && !wallsSet.has(`V_${r}_${c-1}`)) res.push({ r, c: c - 1 });
+            if (c < GRID_SIZE - 1 && !wallsSet.has(`V_${r}_${c}`)) res.push({ r, c: c + 1 });
+            return res;
+        }
+
+        function generateBotSetup() {
+            let rA = Math.floor(Math.random() * GRID_SIZE);
+            let cA = Math.floor(Math.random() * GRID_SIZE);
+            let rB, cB;
+            do {
+                rB = Math.floor(Math.random() * GRID_SIZE);
+                cB = Math.floor(Math.random() * GRID_SIZE);
+            } while (rB === rA && cB === cA);
+
+            let allEdges = [];
+            for (let r = 0; r < 5; r++) for (let c = 0; c < 6; c++) allEdges.push(`H_${r}_${c}`);
+            for (let r = 0; r < 6; r++) for (let c = 0; c < 5; c++) allEdges.push(`V_${r}_${c}`);
+
+            allEdges.sort(() => Math.random() - 0.5);
+
+            let botWalls = new Set();
+            for (let edge of allEdges) {
+                if (botWalls.size >= REQUIRED_WALLS) break;
+                botWalls.add(edge);
+                if (hasIsolatedCell(botWalls) || !isGraphFullyConnected(botWalls)) {
+                    botWalls.delete(edge);
+                }
+            }
+
+            if (botWalls.size < REQUIRED_WALLS) return generateBotSetup();
+
+            return {
+                start: { r: rA, c: cA },
+                goal: { r: rB, c: cB },
+                walls: botWalls
+            };
+        }
+
+        function finishSetup() {
+            botSetup = generateBotSetup();
+
+            playerPos = { ...botSetup.start };
+            botPos = { ...playerSetup.start };
+
+            startBtn.classList.add('hidden');
+            botBoardWrapper.classList.remove('hidden');
+            dpadEl.classList.remove('hidden');
+            document.getElementById('board-title').innerText = "КАРТА ПРОТИВНИКА (ВЫ ХОДИТЕ)";
+
+            gameState = 'PLAYING_PLAYER';
+            updateStatus('Игра началась! <span class="highlight">ВАШ ХОД</span>. Пройдите к точке Б бота.');
+            
+            renderAllBoards();
+        }
+
+        function renderAllBoards() {
+            renderBoard('grid-main', false, false);
+            renderBoard('grid-bot-view', false, true);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (gameState !== 'PLAYING_PLAYER') return;
+            if (['ArrowUp', 'KeyW'].includes(e.code)) playerMove(-1, 0);
+            if (['ArrowDown', 'KeyS'].includes(e.code)) playerMove(1, 0);
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) playerMove(0, -1);
+            if (['ArrowRight', 'KeyD'].includes(e.code)) playerMove(0, 1);
+        });
+
+        function playerMove(dr, dc) {
+            if (gameState !== 'PLAYING_PLAYER') return;
+
+            let targetR = playerPos.r + dr;
+            let targetC = playerPos.c + dc;
+
+            if (targetR < 0 || targetR >= GRID_SIZE || targetC < 0 || targetC >= GRID_SIZE) return;
+
+            let edgeKey = null;
+            if (dr === -1) edgeKey = `H_${playerPos.r - 1}_${playerPos.c}`;
+            if (dr === 1)  edgeKey = `H_${playerPos.r}_${playerPos.c}`;
+            if (dc === -1) edgeKey = `V_${playerPos.r}_${playerPos.c - 1}`;
+            if (dc === 1)  edgeKey = `V_${playerPos.r}_${playerPos.c}`;
+
+            if (botSetup.walls.has(edgeKey)) {
+                playerKnownBotWalls.add(edgeKey);
+                renderAllBoards();
+                triggerShake('main-board-wrapper');
+                updateStatus('<span class="highlight" style="color:#e53170;">ВЫ УПЁРЛИСЬ В СТЕНУ!</span> Ход передается боту.');
+                gameState = 'PLAYING_BOT';
+                setTimeout(botTurn, 1000);
+            } else {
+                playerPos = { r: targetR, c: targetC };
+                renderAllBoards();
+
+                if (playerPos.r === botSetup.goal.r && playerPos.c === botSetup.goal.c) {
+                    gameState = 'GAME_OVER';
+                    updateStatus('<span class="highlight" style="color:#2cb67d; font-size:13px;">ВЫ ПОБЕДИЛИ! 🎉</span>');
+                }
+            }
+        }
+
+        function botTurn() {
+            if (gameState !== 'PLAYING_BOT') return;
+
+            updateStatus('Бот делает ход...');
+
+            let path = findShortestPath(botPos, playerSetup.goal, botMemory.knownWalls);
+            if (!path || path.length < 2) return;
+
+            let nextStep = path[1];
+            let dr = nextStep.r - botPos.r;
+            let dc = nextStep.c - botPos.c;
+
+            let edgeKey = null;
+            if (dr === -1) edgeKey = `H_${botPos.r - 1}_${botPos.c}`;
+            if (dr === 1)  edgeKey = `H_${botPos.r}_${botPos.c}`;
+            if (dc === -1) edgeKey = `V_${botPos.r}_${botPos.c - 1}`;
+            if (dc === 1)  edgeKey = `V_${botPos.r}_${botPos.c}`;
+
+            if (playerSetup.walls.has(edgeKey)) {
+                botMemory.knownWalls.add(edgeKey);
+                triggerShake('bot-board-wrapper');
+                updateStatus('<span class="highlight" style="color:#00b4d8;">БОТ УПЁРСЯ В СТЕНУ!</span> Ваш ход.');
+                gameState = 'PLAYING_PLAYER';
+            } else {
+                botPos = { r: nextStep.r, c: nextStep.c };
+                renderAllBoards();
+
+                if (botPos.r === playerSetup.goal.r && botPos.c === playerSetup.goal.c) {
+                    gameState = 'GAME_OVER';
+                    updateStatus('<span class="highlight" style="color:#e53170; font-size:13px;">БОТ ПОБЕДИЛ! 🤖</span>');
+                } else {
+                    setTimeout(botTurn, 650);
+                }
+            }
+        }
+
+        function findShortestPath(start, goal, blockedWalls) {
+            let queue = [[start]];
+            let visited = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(false));
+            visited[start.r][start.c] = true;
+
+            while (queue.length > 0) {
+                let path = queue.shift();
+                let curr = path[path.length - 1];
+
+                if (curr.r === goal.r && curr.c === goal.c) return path;
+
+                let neighbors = [
+                    { r: curr.r - 1, c: curr.c, edge: `H_${curr.r - 1}_${curr.c}` },
+                    { r: curr.r + 1, c: curr.c, edge: `H_${curr.r}_${curr.c}` },
+                    { r: curr.r, c: curr.c - 1, edge: `V_${curr.r}_${curr.c - 1}` },
+                    { r: curr.r, c: curr.c + 1, edge: `V_${curr.r}_${curr.c}` }
+                ];
+
+                for (let n of neighbors) {
+                    if (n.r >= 0 && n.r < GRID_SIZE && n.c >= 0 && n.c < GRID_SIZE) {
+                        if (!visited[n.r][n.c] && !blockedWalls.has(n.edge)) {
+                            visited[n.r][n.c] = true;
+                            queue.push([...path, { r: n.r, c: n.c }]);
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function triggerShake(elementId) {
+            const el = document.getElementById(elementId);
+            el.classList.add('shake-anim');
+            setTimeout(() => el.classList.remove('shake-anim'), 400);
+        }
+
+        function updateStatus(text) {
+            statusEl.innerHTML = text;
+        }
+    </script>
+</body>
+</html>
